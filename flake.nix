@@ -34,10 +34,10 @@
       fakePkg =
         pkgs:
         pkgs.runCommandLocal "fake-skill-pkg" { } ''
-          mkdir -p "$out/share/skills/fake-skill-pkg/cat-one"
-          echo "---\nname: cat-one\ndescription: Fake.\n---\n\n# Body\n" > "$out/share/skills/fake-skill-pkg/cat-one/SKILL.md"
-          mkdir -p "$out/share/skills/fake-skill-pkg/cat-two"
-          echo "---\nname: cat-two\ndescription: Fake2.\n---\n\n# Body\n" > "$out/share/skills/fake-skill-pkg/cat-two/SKILL.md"
+          mkdir -p "$out/share/skills/cat/cat-one"
+          echo "---\nname: cat-one\ndescription: Fake.\n---\n\n# Body\n" > "$out/share/skills/cat/cat-one/SKILL.md"
+          mkdir -p "$out/share/skills/cat/cat-two"
+          echo "---\nname: cat-two\ndescription: Fake2.\n---\n\n# Body\n" > "$out/share/skills/cat/cat-two/SKILL.md"
         '';
 
       mkBundle = {
@@ -129,6 +129,7 @@
                       packageSkills = [
                         {
                           package = (fakePkg pkgs);
+                          subdir = "share/skills/cat";
                           names = [
                             "cat-one"
                             "cat-two"
@@ -153,7 +154,7 @@
             assert files ? ".pi/agent/skills/example-skill";
             assert lib.hasPrefix "/nix/store" files.".pi/agent/skills/example-skill".source;
             assert files ? ".pi/agent/skills/cat-one";
-            assert files.".pi/agent/skills/cat-one".source == "${fakePkg pkgs}/share/skills/fake-skill-pkg/cat-one";
+            assert files.".pi/agent/skills/cat-one".source == "${fakePkg pkgs}/share/skills/cat/cat-one";
             assert files ? ".cursor/skills/cat-two";
             assert files ? ".claude/skills/cat-one";
             assert files ? ".pi/agent/mcp.json";

@@ -56,15 +56,17 @@ programs.agent-bundle = {
     # (import ./prompts/commit-style.nix) { scope = "api"; }
   ];
 
-  # Or take skills straight from packages. Skills ship under
-  # <pkg>/share/skills/<pkg-name>/<name> — the name you link is the directory:
+  # Or take skills straight from packages — point at the subtree holding the
+  # skills and name the ones to link:
   packageSkills = [
     {
       package = pkgs.llm-agents.open-code-review;
+      subdir = "share/skills/open-code-review";
       names = [ "open-code-review" "open-code-review-delegate" ];
     }
     {
       package = pkgs.llm-agents.workmux;
+      subdir = "share/skills/workmux";
       names = [ "workmux" "worktree" ];
     }
   ];
@@ -117,9 +119,9 @@ programs.agent-bundle = {
 - **Not packaged**: instructions, commands, and agents. They are rejected
   at eval time with an explicit error — use flake-prompt for those.
 - Package skills (`packageSkills`) are linked per-skill from each package's
-  `share/skills/<pkg-name>/<name>` directory — they are not copied into the
-  bundle. A name shared with a `prompts` skill fails the build with an
-  explicit message; a missing skill fails the home-manager activation.
+  skills subtree — they are not copied into the bundle. A name shared with a
+  `prompts` skill fails the build with an explicit message; a missing skill
+  fails the home-manager activation.
 - Skills with the same name are rejected (duplicate).
 - Skill file paths must be relative and must not contain `..`.
 

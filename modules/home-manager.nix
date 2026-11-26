@@ -2,7 +2,7 @@
 # home.
 #
 #   <skillDir>/<skill>  ->  $out/skills/<skill>           (prompt skills, from the bundle)
-#   <skillDir>/<name>   ->  <pkg>/share/skills/<pkg-name>/<name>   (package skills, per-skill)
+#   <skillDir>/<name>   ->  <pkg>/<subdir>/<name>   (package skills, per-skill)
 #   <mcpDir>/mcp.json   ->  $out/<tool>/mcp.json          (when any servers)
 #
 # Per-skill links, same shape as mics-skills' home.file — they coexist with
@@ -48,10 +48,9 @@ let
     ) cfg.skillDirs
   );
 
-  # Package skills link straight from each package's share/skills tree —
-  # per-skill, per-dir, the mics-skills pattern. Skills ship under
-  # <package>/share/skills/<pkg-name>/<name>; a wrong layout fails the
-  # home-manager activation loudly.
+  # Package skills link straight from each package's skills tree —
+  # per-skill, per-dir, the mics-skills pattern. Each entry points at the
+  # subtree holding the skills (e.g. "share/skills/workmux").
   packageLinks = lib.listToAttrs (
     lib.concatMap (
       item:
@@ -60,7 +59,7 @@ let
         map (
           name:
           lib.nameValuePair "${dir}/${name}" {
-            source = "${item.package}/share/skills/${item.package.name}/${name}";
+            source = "${item.package}/${item.subdir}/${name}";
           }
         ) item.names
       ) cfg.skillDirs
@@ -152,11 +151,16 @@ in
         options = {
           package = lib.mkOption {
             type = lib.types.package;
-            description = "Package whose `share/skills` tree is linked.";
+            description = "Package whose skills tree is linked.";
+          };
+          subdir = lib.mkOption {
+            type = lib.types.str;
+            example = "share/skills/workmux";
+            description = "Directory inside the package holding the skills (e.g. "share/skills/workmux"); the link is <package>/<subdir>/<name>.";
           };
           names = lib.mkOption {
             type = lib.types.listOf lib.types.str;
-            description = "Skills to link from the package's share/skills tree; each must exist at <package>/share/skills/<pkg-name>/<name>.";
+            description = "Skills to link; each must exist at <package>/<subdir>/<name>.";
           };
         };
       });
@@ -165,15 +169,16 @@ in
         [
           {
             package = pkgs.llm-agents.open-code-review;
+            subdir = "share/skills/open-code-review";
             names = [ "open-code-review" "open-code-review-delegate" ];
           }
         ]
       '';
       description = ''
         Packages whose skills are symlinked into skillDirs (per-skill links,
-        same pattern as mics-skills). Each entry names the skills to link;
-        the link points at `<package>/share/skills/<pkg-name>/<name>` and
-        `<name>` must exist there — a missing skill fails the home-manager
+        same pattern as mics-skills). Each entry names the package, its skills
+        subtree and the skills to link; `<name>` must exist at
+        `<package>/<subdir>/<name>` — a missing skill fails the home-manager
         activation.
       '';
     };
