@@ -1,11 +1,12 @@
 # Minimal skills renderer, standalone (no flake-prompt).
 #
 # Renders flake-prompt-style skill attrsets into the frontmatter+body text
-# of a skill's SKILL.md, per tool. Commands, agents and instructions are
-# rejected: this repo packages skills and mcp.json only.
+# of a skill's SKILL.md. Agents and commands degrade to skills (same rule
+# flake-prompt uses); instructions are not packaged: they are never skills.
 { lib }:
 
 let
+  degrade = import ./degrade.nix { inherit lib; };
   keyPattern = "[A-Za-z0-9_-]+";
 
   # JSON scalar encoding: JSON is a strict subset of YAML 1.2, so strings with
@@ -27,20 +28,28 @@ let
 
   # evalPrompt: a plain attrset (or a function applied to default args) ->
   # validated skill. Body and description are required.
+  # Non-skill prompts (agents, commands) degrade to skills — the same rule
+  # flake-prompt applies for tools without native support. Instructions are
+  # not packaged at all.
   evalPrompt =
     promptOrFn:
     let
       raw = if builtins.isFunction promptOrFn then promptOrFn { } else promptOrFn;
-      type = raw.type or "skill";
-      name = raw.name or null;
-      description = raw.description or null;
-      body = raw.body or null;
-      files = raw.files or { };
-      disableModelInvocation = raw.disableModelInvocation or false;
-      extraFrontmatter = raw.extraFrontmatter or { };
+      p0 =
+        if (raw.type or "skill") == "skill" then
+          raw
+        else
+          degrade.degradeToSkill raw;
+      type = p0.type;
+      name = p0.name or null;
+      description = p0.description or null;
+      body = p0.body or null;
+      files = p0.files or { };
+      disableModelInvocation = p0.disableModelInvocation or false;
+      extraFrontmatter = p0.extraFrontmatter or { };
     in
     assert lib.assertMsg (type == "skill")
-      "agent-bundle: only skills are packaged (got type '${type}'); commands, agents and instructions belong to flake-prompt";
+      "agent-bundle: only skills are packaged (got type '${type}')";
     assert lib.assertMsg (name != null) "agent-bundle: skill is missing a name";
     assert lib.assertMsg (
       builtins.match "[a-z0-9][a-z0-9-]*" name != null
@@ -50,9 +59,10 @@ let
     assert lib.assertMsg (lib.all (p: !lib.hasPrefix "/" p && !lib.hasInfix ".." p) (
       lib.attrNames files
     )) "agent-bundle: skill '${name}': file paths must be relative and must not contain '..'";
-    assert lib.assertMsg (lib.all (f: (f.text != null) != (f.source or null != null)) (
-      lib.attrValues files
-    )) "agent-bundle: skill '${name}': each file entry must set exactly one of `text` or `source`";
+    assert lib.assertMsg (lib.all (f:
+      let t = f.text or null; s = f.source or null; in (t != null) != (s != null)
+    ) (lib.attrValues files))
+      "agent-bundle: skill '${name}': each file entry must set exactly one of `text` or `source`";
     assert lib.assertMsg (lib.all (k: checkKey " (in extraFrontmatter)" k) (
       lib.attrNames extraFrontmatter
     )) "agent-bundle: skill '${name}': invalid frontmatter key";
@@ -86,7 +96,11 @@ let
       inherit (p) name;
       text = text;
       files = lib.mapAttrs (
-        _: f: if f.text != null then { inherit (f) text; } else { inherit (f) source executable; }
+        _: f:
+        if (f.text or null) != null then
+          { text = f.text; }
+        else
+          { source = f.source or null; executable = f.executable or false; }
       ) p.files;
     };
 in

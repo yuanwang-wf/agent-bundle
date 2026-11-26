@@ -65,7 +65,18 @@
     {
       lib = {
         mkAgentBundlePackage = pkgs: args: agentBundleLib.mkAgentBundlePackage ({ inherit pkgs; } // args);
-        inherit (agentBundleLib) normalizeServers validateServers hasMcp;
+        inherit
+          (agentBundleLib)
+          normalizeServers
+          validateServers
+          hasMcp
+          evalPrompt
+          renderSkill
+          parseMarkdownDoc
+          promptFromMarkdown
+          skillFromDir
+          degradeToSkill
+          ;
       };
 
       homeManagerModules = {

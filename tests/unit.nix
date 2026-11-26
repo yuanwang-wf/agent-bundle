@@ -29,13 +29,46 @@ lib.runTests {
     expected = true;
   };
 
-  testSkillRejectsNonSkill = {
+  testAgentDegradesToSkill = {
+    expr =
+      let
+        degraded = evalPrompt {
+          type = "agent";
+          name = "not-a-skill";
+          description = "x";
+          body = "persona body";
+        };
+      in
+      degraded.type
+      == "skill"
+      && lib.hasPrefix "# Subagent persona: not-a-skill" degraded.body
+      && degraded.files == { };
+    expected = true;
+  };
+
+  testInstructionRejected = {
     expr = tryFails (evalPrompt {
-      type = "agent";
-      name = "not-a-skill";
-      description = "x";
+      type = "instructions";
+      name = "house";
       body = "x";
     });
+    expected = true;
+  };
+
+  testSourceFileEntries = {
+    expr =
+      let
+        p = evalPrompt {
+          type = "skill";
+          name = "with-files";
+          description = "x";
+          body = "x";
+          files = {
+            "references/a.md".source = ./fixtures/source-skill-ref.md;
+          };
+        };
+      in
+      p.files."references/a.md".source != null;
     expected = true;
   };
 
