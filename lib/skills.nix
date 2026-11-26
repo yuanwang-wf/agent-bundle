@@ -85,10 +85,12 @@ let
       }
       // lib.optionalAttrs p.disableModelInvocation { disable-model-invocation = true; }
       // p.extraFrontmatter;
+      # Null-valued keys are dropped, as in the fork's mkDoc.
+      frontmatter' = lib.filterAttrs (_: v: v != null) frontmatter;
       body = lib.removeSuffix "\n" p.body;
       text =
         let
-          fmText = toYamlFrontmatter frontmatter;
+          fmText = toYamlFrontmatter frontmatter';
         in
         "---\n${fmText}---\n\n${body}\n";
     in
