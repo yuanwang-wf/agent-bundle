@@ -126,6 +126,14 @@
                         ".cursor/skills"
                         ".claude/skills"
                       ];
+                      skillSources = [
+                        {
+                          name = "cat-raw";
+                          # Scoped to the pi dir…
+                          source = "${fakePkg pkgs}/share/skills/cat";
+                          skillDirs = [ ".pi/agent/skills" ];
+                        }
+                      ];
                       packageSkills = [
                         {
                           # Restricted to the pi skills dir…
@@ -160,6 +168,10 @@
             assert !(files ? ".cursor/skills/cat-one");
             assert !(files ? ".cursor/skills/cat-two");
             assert !(files ? ".claude/skills/cat-one");
+            assert files ? ".pi/agent/skills/cat-raw";
+            assert files.".pi/agent/skills/cat-raw".recursive;
+            assert !(files ? ".cursor/skills/cat-raw");
+            assert !(files ? ".claude/skills/cat-raw");
             assert files ? ".pi/agent/mcp.json";
             assert files ? ".cursor/mcp.json";
             assert files ? ".claude/mcp.json";

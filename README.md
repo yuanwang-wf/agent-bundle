@@ -19,10 +19,10 @@ $out/
   cursor/mcp.json                        (when any cursor mcpServers are enabled)
 ```
 
-The module links the prompt skills from the bundle's tree and each package
-skill straight from the package's `share/skills` tree — per-skill links, the
-same shape mics-skills uses, into whatever `skillDirs` points at (e.g. both
-pi and cursor, or a third harness's dir while keeping mcp.json for pi/cursor).
+The module links the prompt skills from the bundle's tree, each package skill
+straight from the package's `share/skills` tree, and each raw source skill
+straight from the source dir — per-skill links, the same shape mics-skills
+uses — into whatever `skillDirs` (or each entry's own `skillDirs`) points at.
 
 ## Use it
 
@@ -70,6 +70,15 @@ programs.agent-bundle = {
       package = pkgs.llm-agents.workmux;
       subdir = "share/skills/workmux";
       names = [ "workmux" "worktree" ];
+    }
+  ];
+
+  # Raw source skills — the whole tree linked as-is, scoped the same way:
+  skillSources = [
+    {
+      name = "emacs-skills";
+      source = inputs.emacs-skills + /skills;
+      skillDirs = [ ".cursor/skills" ];
     }
   ];
 
@@ -124,6 +133,10 @@ programs.agent-bundle = {
   skills subtree — they are not copied into the bundle. A name shared with a
   `prompts` skill fails the build with an explicit message; a missing skill
   fails the home-manager activation.
+- Raw source skills (`skillSources`) are linked recursively from a source
+  directory as-is — the whole tree goes out (e.g. a whole `skills/` dir of
+  upstream Emacs skills) — same per-entry `skillDirs` scope as package
+  skills.
 - Skills with the same name are rejected (duplicate).
 - Skill file paths must be relative and must not contain `..`.
 

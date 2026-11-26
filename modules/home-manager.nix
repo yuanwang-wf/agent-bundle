@@ -3,6 +3,7 @@
 #
 #   <skillDir>/<skill>  ->  $out/skills/<skill>           (prompt skills, from the bundle)
 #   <skillDir>/<name>   ->  <pkg>/<subdir>/<name>   (package skills, per-skill, into entry skillDirs)
+#   <skillDir>/<name>   ->  <source>                 (raw source skills, recursive)
 #   <mcpDir>/mcp.json   ->  $out/<tool>/mcp.json          (when any servers)
 #
 # Per-skill links, same shape as mics-skills' home.file — they coexist with
@@ -68,6 +69,20 @@ let
     ) cfg.packageSkills
   );
 
+  # Raw source skills link the source dir as-is (recursive) per skill.
+  skillSourceLinks = lib.listToAttrs (
+    lib.concatMap (
+      item:
+      lib.concatMap (
+        dir:
+        [ (lib.nameValuePair "${dir}/${item.name}" {
+          source = item.source;
+          recursive = true;
+        }) ]
+      ) (if item.skillDirs != null then item.skillDirs else cfg.skillDirs)
+    ) cfg.skillSources
+  );
+
   # mcp.json goes into every mcpDirs entry.
   mcpLinks =
     lib.optionalAttrs (lib.elem "pi" cfg.tools && hasMcp "pi") (
@@ -94,6 +109,7 @@ let
   links = lib.mkMerge [
     promptLinks
     packageLinks
+    skillSourceLinks
     mcpLinks
   ];
 in
@@ -191,6 +207,43 @@ in
         `<package>/<subdir>/<name>` — a missing skill fails the home-manager
         activation. Every entry links into the module's skillDirs unless the
         entry sets its own `skillDirs`, restricting the target dirs.
+      '';
+    };
+
+    skillSources = lib.mkOption {
+      type = lib.types.listOf (lib.types.submodule {
+        options = {
+          name = lib.mkOption {
+            type = lib.types.str;
+            description = "Skill name; links as <skillDir>/<name>.";
+          };
+          source = lib.mkOption {
+            type = lib.types.path;
+            description = "Path to a skill directory (must contain SKILL.md), linked recursively as-is.";
+          };
+          skillDirs = lib.mkOption {
+            type = lib.types.nullOr (lib.types.listOf lib.types.str);
+            default = null;
+            example = lib.literalExpression ''[ ".cursor/skills" ]'';
+            description = "Directories to link this skill source into; defaults to the module's skillDirs.";
+          };
+        };
+      });
+      default = [ ];
+      example = lib.literalExpression ''
+        [
+          {
+            name = "caveman";
+            source = inputs.claude-prompts + /skills/caveman;
+            skillDirs = [ ".cursor/skills" ];
+          }
+        ]
+      '';
+      description = ''
+        Raw skill source trees, linked recursively per skill — the whole tree
+        goes out as-is (same shape as a hand-rolled per-dir recursive link).
+        An entry can restrict the target dirs with its own skillDirs;
+        defaults to the module's skillDirs.
       '';
     };
 
