@@ -63,7 +63,7 @@ let
     pkgs: path: entry:
     let
       src =
-        if entry.text != null then pkgs.writeText (builtins.baseNameOf path) entry.text else entry.source;
+        if (entry.text or null) != null then pkgs.writeText (builtins.baseNameOf path) entry.text else entry.source;
     in
     ''
       mkdir -p "$out/${builtins.dirOf path}"
