@@ -64,7 +64,7 @@ let
             source = "${item.package}/${item.subdir}/${name}";
           }
         ) item.names
-      ) (item.skillDirs or cfg.skillDirs)
+      ) (if item.skillDirs != null then item.skillDirs else cfg.skillDirs)
     ) cfg.packageSkills
   );
 
