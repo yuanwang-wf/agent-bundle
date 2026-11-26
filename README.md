@@ -10,7 +10,7 @@ need tool-specific knowledge are exactly the two tools this repo packages).
 If you already use flake-prompt or pi-flake, their path is unchanged — this
 repo coexists; it just does the pi+Cursor slice in one package.
 
-A bundle is a derivation with this tree:
+A bundle is a derivation with this tree (prompt skills only — package skills are linked directly from their packages):
 
 ```
 $out/
@@ -19,10 +19,10 @@ $out/
   cursor/mcp.json                        (when any cursor mcpServers are enabled)
 ```
 
-Skills are identical for pi and cursor (both read plain SKILL.md), so the
-tree holds one shared `skills/` directory. The module links it wherever you
-point `skillDirs` — e.g. both pi and cursor, or a third harness's dir while
-keeping mcp.json for pi and cursor.
+The module links the prompt skills from the bundle's tree and each package
+skill straight from the package's `share/skills` tree — per-skill links, the
+same shape mics-skills uses, into whatever `skillDirs` points at (e.g. both
+pi and cursor, or a third harness's dir while keeping mcp.json for pi/cursor).
 
 ## Use it
 
@@ -56,12 +56,17 @@ programs.agent-bundle = {
     # (import ./prompts/commit-style.nix) { scope = "api"; }
   ];
 
-  # Or take skills straight from packages: every directory containing a
-  # SKILL.md under <pkg>/share/skills becomes a skill named after that
-  # directory (same convention as mics-skills, installAgentSkills-style).
+  # Or take skills straight from packages. Skills ship under
+  # <pkg>/share/skills/<pkg-name>/<name> — the name you link is the directory:
   packageSkills = [
-    pkgs.llm-agents.open-code-review
-    pkgs.llm-agents.workmux
+    {
+      package = pkgs.llm-agents.open-code-review;
+      names = [ "open-code-review" "open-code-review-delegate" ];
+    }
+    {
+      package = pkgs.llm-agents.workmux;
+      names = [ "workmux" "worktree" ];
+    }
   ];
 
   mcpServers = {
@@ -77,11 +82,11 @@ programs.agent-bundle = {
 }
 ```
 
-Home Manager then links each `skillDirs` entry recursively to
-`$out/skills`, plus `<mcpDir>/mcp.json` for every `mcpDirs` entry and each
-tool with a server set (when the servers exist). The skills are one atomic
-directory link per directory (no per-file links), and `mcp.json` is replaced
-atomically on each switch.
+Home Manager then links each prompt skill per-skill from the bundle tree,
+each package skill per-skill from the package, and `<mcpDir>/mcp.json` for
+every `mcpDirs` entry and each tool with a server set. Links are `<skillDir>/<name>`
+per `skillDirs` entry and `<mcpDir>/mcp.json` per `mcpDirs` entry — they
+coexist with per-file links (e.g. flake-prompt) in the same directories.
 
 ```nix
 programs.agent-bundle = {
@@ -111,10 +116,10 @@ programs.agent-bundle = {
   them entirely.
 - **Not packaged**: instructions, commands, and agents. They are rejected
   at eval time with an explicit error — use flake-prompt for those.
-- Package skills (`packageSkills`) are merged into the same tree; a name
-  shared with a `prompts` skill, or repeated across packages, fails the build
-  with an explicit message. A package with no `share/skills` directory is
-  likewise an error — the contract didn't match what you passed.
+- Package skills (`packageSkills`) are linked per-skill from each package's
+  `share/skills/<pkg-name>/<name>` directory — they are not copied into the
+  bundle. A name shared with a `prompts` skill fails the build with an
+  explicit message; a missing skill fails the home-manager activation.
 - Skills with the same name are rejected (duplicate).
 - Skill file paths must be relative and must not contain `..`.
 

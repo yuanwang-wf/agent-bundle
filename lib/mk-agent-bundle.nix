@@ -3,9 +3,10 @@
 #   $out/pi/mcp.json                       (when any pi mcpServers are enabled)
 #   $out/cursor/mcp.json                   (when any cursor mcpServers are enabled)
 # Skills are identical across pi and cursor (both read plain SKILL.md), so
-# there is one shared skills tree; the module symlinks it wherever you want.
-# `packageSkills` are copied from each package's `share/skills` tree — every
-# directory containing a SKILL.md becomes a skill named after that directory.
+# there is one shared skills tree; the module symlinks each referenced skill
+# per-skill into every skillDirs entry (same pattern as mics-skills).
+# Package skills are linked straight from each package's share/skills tree —
+# they are not copied into the bundle.
 { lib }:
 
 let
@@ -72,32 +73,6 @@ let
       ''}
     '';
 
-  # For every package in `packageSkills`, copy every directory containing a
-  # SKILL.md under share/skills into the skills tree, named after the skill
-  # directory. A package with no share/skills directory at all is an error:
-  # the caller passed something whose contract does not match.
-  packageSkillCopy = promptSkillNames: packageSkills: ''
-    seen="${lib.concatStringsSep " " promptSkillNames}"
-    skillMads=""
-    for pkg in ${lib.concatStringsSep " " packageSkills}; do
-      if [ ! -d "$pkg/share/skills" ]; then
-        echo "agent-bundle: package $pkg has no share/skills directory" >&2
-        exit 1
-      fi
-      skillMads="$skillMads $(find "$pkg/share/skills" -name SKILL.md)"
-    done
-    for skillMd in $skillMads; do
-      skillDir=$(dirname "$skillMd")
-      name=$(basename "$skillDir")
-      if printf '%s\n' $seen | grep -Fx "$name" >/dev/null; then
-        echo "agent-bundle: duplicate skill name '$name' (package skills and prompt skills must not collide)" >&2
-        exit 1
-      fi
-      seen="$seen $name"
-      mkdir -p "$out/skills/$name"
-      cp -R "$skillDir/." "$out/skills/$name/"
-    done
-  '';
 in
 {
   inherit normalizeServers validateServers hasMcp;
@@ -107,7 +82,6 @@ in
       pkgs,
       name ? "agent-bundle",
       prompts ? [ ],
-      packageSkills ? [ ],
       mcpServers ? { },
       tools ? [
         "pi"
@@ -146,9 +120,6 @@ in
         ) rendered
       );
 
-      # Names of prompt skills, used as the collision baseline for package skills.
-      promptSkillNames = map (s: s.name) rendered;
-
       piMcp =
         if lib.elem "pi" enabledTools then
           mcp {
@@ -182,7 +153,6 @@ in
           mkdir -p "$out/cursor"
           cp ${cursorMcp} "$out/cursor/mcp.json"
         ''
-        + packageSkillCopy promptSkillNames packageSkills
       )
     else
       throw "agent-bundle: duplicate skill name(s) in prompt set: ${lib.concatStringsSep ", " (lib.unique duplicateNames)}";

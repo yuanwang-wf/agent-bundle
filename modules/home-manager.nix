@@ -1,12 +1,15 @@
-# home-manager module: link the packaged skills and mcp.json for pi and
-# cursor into the user's home.
+# home-manager module: link the packaged skills and mcp.json into the user's
+# home.
 #
-#   <skillDir>/<skill>/ (recursive) <- $out/skills
-#   <mcpDir>/mcp.json               <- $out/<tool>/mcp.json          (when any servers)
+#   <skillDir>/<skill>  ->  $out/skills/<skill>           (prompt skills, from the bundle)
+#   <skillDir>/<name>   ->  <pkg>/share/skills/<pkg-name>/<name>   (package skills, per-skill)
+#   <mcpDir>/mcp.json   ->  $out/<tool>/mcp.json          (when any servers)
 #
-# `<skillDir>` and `<mcpDir>` come from `programs.agent-bundle.skillDirs` and
-# `.mcpDirs` — one per agent harness, the same shape as mics-skills'
-# `skillDirs`. Defaults: the skills / mcp.json parent dirs of the enabled tools.
+# Per-skill links, same shape as mics-skills' home.file — they coexist with
+# per-file links (flake-prompt) in the same directory. `<skillDir>` and
+# `<mcpDir>` come from `programs.agent-bundle.skillDirs` / `.mcpDirs` — one
+# per agent harness, same shape as mics-skills' `skillDirs`. Defaults: the
+# skills / mcp.json parent dirs of the enabled tools.
 { lib }:
 
 { config, pkgs, ... }:
@@ -14,12 +17,17 @@ let
   cfg = config.programs.agent-bundle;
 
   agentBundle = import ../lib { inherit lib; };
+  skillsLib = import ../lib/skills.nix { inherit lib; };
 
   normalizedServers = agentBundle.normalizeServers cfg.mcpServers;
 
+  # Names of the prompt skills, known at eval time — prompt skills link from
+  # the bundle's skills tree.
+  promptSkillNames = map (p: (skillsLib.renderSkill (skillsLib.evalPrompt p)).name) cfg.prompts;
+
   bundle = agentBundle.mkAgentBundlePackage {
     inherit pkgs;
-    inherit (cfg) prompts packageSkills;
+    inherit (cfg) prompts;
     mcpServers = cfg.mcpServers;
     tools = cfg.tools;
     name = "agent-bundle";
@@ -27,7 +35,39 @@ let
 
   hasMcp = t: agentBundle.hasMcp normalizedServers t;
 
-  # Skills go into every skillDirs entry; mcp.json into every mcpDirs entry.
+  # Prompt skills: every skillDirs entry gets a per-skill link to the bundle.
+  promptLinks = lib.listToAttrs (
+    lib.concatMap (
+      dir:
+      map (
+        name:
+        lib.nameValuePair "${dir}/${name}" {
+          source = "${bundle}/skills/${name}";
+        }
+      ) promptSkillNames
+    ) cfg.skillDirs
+  );
+
+  # Package skills link straight from each package's share/skills tree —
+  # per-skill, per-dir, the mics-skills pattern. Skills ship under
+  # <package>/share/skills/<pkg-name>/<name>; a wrong layout fails the
+  # home-manager activation loudly.
+  packageLinks = lib.listToAttrs (
+    lib.concatMap (
+      item:
+      lib.concatMap (
+        dir:
+        map (
+          name:
+          lib.nameValuePair "${dir}/${name}" {
+            source = "${item.package}/share/skills/${item.package.name}/${name}";
+          }
+        ) item.names
+      ) cfg.skillDirs
+    ) cfg.packageSkills
+  );
+
+  # mcp.json goes into every mcpDirs entry.
   mcpLinks =
     lib.optionalAttrs (lib.elem "pi" cfg.tools && hasMcp "pi") (
       lib.listToAttrs (
@@ -51,15 +91,8 @@ let
     );
 
   links = lib.mkMerge [
-    (lib.listToAttrs (
-      map (
-        dir:
-        lib.nameValuePair dir {
-          source = "${bundle}/skills";
-          recursive = true;
-        }
-      ) cfg.skillDirs
-    ))
+    promptLinks
+    packageLinks
     mcpLinks
   ];
 in
@@ -115,17 +148,33 @@ in
     };
 
     packageSkills = lib.mkOption {
-      type = lib.types.listOf lib.types.package;
+      type = lib.types.listOf (lib.types.submodule {
+        options = {
+          package = lib.mkOption {
+            type = lib.types.package;
+            description = "Package whose `share/skills` tree is linked.";
+          };
+          names = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            description = "Skills to link from the package's share/skills tree; each must exist at <package>/share/skills/<pkg-name>/<name>.";
+          };
+        };
+      });
       default = [ ];
       example = lib.literalExpression ''
-        [ pkgs.llm-agents.open-code-review ]
+        [
+          {
+            package = pkgs.llm-agents.open-code-review;
+            names = [ "open-code-review" "open-code-review-delegate" ];
+          }
+        ]
       '';
       description = ''
-        Packages whose skills are linked into skillDirs. Every directory
-        containing a SKILL.md under `share/skills` in each package becomes a
-        skill named after that directory; the package is copied into the
-        bundle at build time. Fails loudly if a package has no share/skills
-        directory or two skills collide in name.
+        Packages whose skills are symlinked into skillDirs (per-skill links,
+        same pattern as mics-skills). Each entry names the skills to link;
+        the link points at `<package>/share/skills/<pkg-name>/<name>` and
+        `<name>` must exist there — a missing skill fails the home-manager
+        activation.
       '';
     };
 

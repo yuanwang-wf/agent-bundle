@@ -34,10 +34,10 @@
       fakePkg =
         pkgs:
         pkgs.runCommandLocal "fake-skill-pkg" { } ''
-          mkdir -p "$out/share/skills/cat/cat-one"
-          echo "---\nname: cat-one\ndescription: Fake.\n---\n\n# Body\n" > "$out/share/skills/cat/cat-one/SKILL.md"
-          mkdir -p "$out/share/skills/cat/cat-two"
-          echo "---\nname: cat-two\ndescription: Fake2.\n---\n\n# Body\n" > "$out/share/skills/cat/cat-two/SKILL.md"
+          mkdir -p "$out/share/skills/fake-skill-pkg/cat-one"
+          echo "---\nname: cat-one\ndescription: Fake.\n---\n\n# Body\n" > "$out/share/skills/fake-skill-pkg/cat-one/SKILL.md"
+          mkdir -p "$out/share/skills/fake-skill-pkg/cat-two"
+          echo "---\nname: cat-two\ndescription: Fake2.\n---\n\n# Body\n" > "$out/share/skills/fake-skill-pkg/cat-two/SKILL.md"
         '';
 
       mkBundle = {
@@ -77,11 +77,9 @@
         system: pkgs:
         let
           pkg = agentBundleLib.mkAgentBundlePackage (
-            mkBundle
-            // {
+            mkBundle // {
               inherit pkgs;
               name = "agent-bundle-check";
-              packageSkills = [ (fakePkg pkgs) ];
             }
           );
         in
@@ -106,8 +104,6 @@
             test -f ${pkg}/pi/mcp.json
             test -f ${pkg}/cursor/mcp.json
             test -f ${pkg}/skills/example-skill/SKILL.md
-            test -f ${pkg}/skills/cat-one/SKILL.md
-            test -f ${pkg}/skills/cat-two/SKILL.md
             touch $out
           '';
 
@@ -130,6 +126,15 @@
                         ".cursor/skills"
                         ".claude/skills"
                       ];
+                      packageSkills = [
+                        {
+                          package = (fakePkg pkgs);
+                          names = [
+                            "cat-one"
+                            "cat-two"
+                          ];
+                        }
+                      ];
                       # mcpDirs are independent of tools: a dir that no tool
                       # owns is still linked, as is a tool's own parent dir.
                       mcpDirs = [
@@ -143,13 +148,16 @@
               };
               files = hmConfig.config.home.file;
             in
-            assert files ? ".pi/agent/skills";
+            # Per-skill links (mics-skills shape) — the prompt skill links
+            # from the bundle, the package skills link from the package.
+            assert files ? ".pi/agent/skills/example-skill";
+            assert lib.hasPrefix "/nix/store" files.".pi/agent/skills/example-skill".source;
+            assert files ? ".pi/agent/skills/cat-one";
+            assert files.".pi/agent/skills/cat-one".source == "${fakePkg pkgs}/share/skills/fake-skill-pkg/cat-one";
+            assert files ? ".cursor/skills/cat-two";
+            assert files ? ".claude/skills/cat-one";
             assert files ? ".pi/agent/mcp.json";
-            assert files ? ".cursor/skills";
             assert files ? ".cursor/mcp.json";
-            # skillDirs are independent of tools: a skills dir for a tool with
-            # no mcp.json is still linked.
-            assert files ? ".claude/skills";
             assert files ? ".claude/mcp.json";
             pkgs.runCommandLocal "agent-bundle-hm-eval" { } "touch $out";
         }
