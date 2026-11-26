@@ -128,12 +128,14 @@
                       ];
                       packageSkills = [
                         {
+                          # Restricted to the pi skills dir…
                           package = (fakePkg pkgs);
                           subdir = "share/skills/cat";
                           names = [
                             "cat-one"
                             "cat-two"
                           ];
+                          skillDirs = [ ".pi/agent/skills" ];
                         }
                       ];
                       # mcpDirs are independent of tools: a dir that no tool
@@ -149,14 +151,15 @@
               };
               files = hmConfig.config.home.file;
             in
-            # Per-skill links (mics-skills shape) — the prompt skill links
-            # from the bundle, the package skills link from the package.
+            # Per-skill links (mics-skills shape). The package skill is scoped
+            # to the pi dir: no cursor/claude links for it.
             assert files ? ".pi/agent/skills/example-skill";
             assert lib.hasPrefix "/nix/store" files.".pi/agent/skills/example-skill".source;
             assert files ? ".pi/agent/skills/cat-one";
             assert files.".pi/agent/skills/cat-one".source == "${fakePkg pkgs}/share/skills/cat/cat-one";
-            assert files ? ".cursor/skills/cat-two";
-            assert files ? ".claude/skills/cat-one";
+            assert !(files ? ".cursor/skills/cat-one");
+            assert !(files ? ".cursor/skills/cat-two");
+            assert !(files ? ".claude/skills/cat-one");
             assert files ? ".pi/agent/mcp.json";
             assert files ? ".cursor/mcp.json";
             assert files ? ".claude/mcp.json";

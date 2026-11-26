@@ -2,7 +2,7 @@
 # home.
 #
 #   <skillDir>/<skill>  ->  $out/skills/<skill>           (prompt skills, from the bundle)
-#   <skillDir>/<name>   ->  <pkg>/<subdir>/<name>   (package skills, per-skill)
+#   <skillDir>/<name>   ->  <pkg>/<subdir>/<name>   (package skills, per-skill, into entry skillDirs)
 #   <mcpDir>/mcp.json   ->  $out/<tool>/mcp.json          (when any servers)
 #
 # Per-skill links, same shape as mics-skills' home.file — they coexist with
@@ -50,7 +50,9 @@ let
 
   # Package skills link straight from each package's skills tree —
   # per-skill, per-dir, the mics-skills pattern. Each entry points at the
-  # subtree holding the skills (e.g. "share/skills/workmux").
+  # subtree holding the skills (e.g. "share/skills/workmux"). An entry can
+  # restrict the target dirs with its own `skillDirs`; otherwise the module's
+  # skillDirs are used (every enabled tool's skills dir).
   packageLinks = lib.listToAttrs (
     lib.concatMap (
       item:
@@ -62,7 +64,7 @@ let
             source = "${item.package}/${item.subdir}/${name}";
           }
         ) item.names
-      ) cfg.skillDirs
+      ) (item.skillDirs or cfg.skillDirs)
     ) cfg.packageSkills
   );
 
@@ -162,6 +164,12 @@ in
             type = lib.types.listOf lib.types.str;
             description = "Skills to link; each must exist at <package>/<subdir>/<name>.";
           };
+          skillDirs = lib.mkOption {
+            type = lib.types.nullOr (lib.types.listOf lib.types.str);
+            default = null;
+            example = lib.literalExpression ''[ ".pi/agent/skills" ]'';
+            description = "Directories to link this package's skills into; defaults to the module's skillDirs (every enabled tool's skills dir).";
+          };
         };
       });
       default = [ ];
@@ -171,6 +179,8 @@ in
             package = pkgs.llm-agents.open-code-review;
             subdir = "share/skills/open-code-review";
             names = [ "open-code-review" "open-code-review-delegate" ];
+            # Omit to link into every enabled tool's skills dir:
+            # skillDirs = [ ".pi/agent/skills" ];
           }
         ]
       '';
@@ -179,7 +189,8 @@ in
         same pattern as mics-skills). Each entry names the package, its skills
         subtree and the skills to link; `<name>` must exist at
         `<package>/<subdir>/<name>` — a missing skill fails the home-manager
-        activation.
+        activation. Every entry links into the module's skillDirs unless the
+        entry sets its own `skillDirs`, restricting the target dirs.
       '';
     };
 

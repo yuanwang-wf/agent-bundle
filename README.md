@@ -57,12 +57,14 @@ programs.agent-bundle = {
   ];
 
   # Or take skills straight from packages — point at the subtree holding the
-  # skills and name the ones to link:
+  # skills and name the ones to link. Skills link into every skillDirs entry
+  # unless the entry sets its own skillDirs, restricting the target dirs:
   packageSkills = [
     {
       package = pkgs.llm-agents.open-code-review;
       subdir = "share/skills/open-code-review";
       names = [ "open-code-review" "open-code-review-delegate" ];
+      skillDirs = [ ".pi/agent/skills" ];  # restrict to pi
     }
     {
       package = pkgs.llm-agents.workmux;
